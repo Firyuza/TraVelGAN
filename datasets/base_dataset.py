@@ -8,7 +8,7 @@ from utils.fileio.file_loader import load
 
 
 @DATASETS.register_module
-class CustomDataset:
+class BaseDataset:
     """Custom dataset for detection.
 
     Annotation format:
@@ -133,19 +133,19 @@ class CustomDataset:
                 continue
             return data
 
-    def prepare_train_img(self, idx):
-        img_info = self.img_infos[idx]
-        ann_info = self.get_ann_info(idx)
-        results = dict(img_info=img_info, ann_info=ann_info)
-        if self.proposals is not None:
-            results['proposals'] = self.proposals[idx]
-        self.pre_pipeline(results)
-        return self.pipeline(results)
-
-    def prepare_test_img(self, idx):
-        img_info = self.img_infos[idx]
-        results = dict(img_info=img_info)
-        if self.proposals is not None:
-            results['proposals'] = self.proposals[idx]
-        self.pre_pipeline(results)
-        return self.pipeline(results)
+    # def prepare_train_img(self, idx):
+    #     img_info = self.img_infos[idx]
+    #     ann_info = self.get_ann_info(idx)
+    #     results = dict(img_info=img_info, ann_info=ann_info)
+    #     if self.proposals is not None:
+    #         results['proposals'] = self.proposals[idx]
+    #     self.pre_pipeline(results)
+    #     return self.pipeline(results)
+    #
+    # def prepare_test_img(self, idx):
+    #     img_info = self.img_infos[idx]
+    #     results = dict(img_info=img_info)
+    #     if self.proposals is not None:
+    #         results['proposals'] = self.proposals[idx]
+    #     self.pre_pipeline(results)
+    #     return self.pipeline(results)

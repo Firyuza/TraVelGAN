@@ -1,12 +1,12 @@
 import numpy as np
 from pycocotools.coco import COCO
 
-from .custom import CustomDataset
+from .base_dataset import BaseDataset
 from .registry import DATASETS
 
 
 @DATASETS.register_module
-class CocoDataset(CustomDataset):
+class CocoDataset(BaseDataset):
 
     CLASSES = ('person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
                'train', 'truck', 'boat', 'traffic_light', 'fire_hydrant',

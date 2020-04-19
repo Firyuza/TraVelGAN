@@ -77,10 +77,11 @@ class UNet(tf.keras.models.Model):
 
     def call_loss(self, predictions):
         assert self.loss_type is not None
+        losses = dict()
 
-        G_adv = self.loss_type(predictions, tf.ones_like(predictions))
+        losses['G_adv'] = self.loss_type(predictions, tf.ones_like(predictions))
 
-        return G_adv
+        return losses
 
     def call(self, input_tensor, is_training=True):
         output_1, output = self.conv3x3_1(input_tensor)

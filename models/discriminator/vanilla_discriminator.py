@@ -32,14 +32,16 @@ class Discriminator(tf.keras.models.Model):
     def call_loss(self, real, fake):
         assert self.loss_type is not None
 
+        losses = dict()
+
         real_predictions = tf.sigmoid(real)
         fake_predictions = tf.sigmoid(fake)
 
-        D_real = self.loss_type(real_predictions, tf.ones_like(real_predictions))
-        D_fake = self.loss_type(fake_predictions, tf.zeros_like(fake_predictions))
-        D_loss = D_real + D_fake
+        losses['D_real'] = self.loss_type(real_predictions, tf.ones_like(real_predictions))
+        losses['D_fake'] = self.loss_type(fake_predictions, tf.zeros_like(fake_predictions))
+        losses['D_loss'] = losses['D_real'] + losses['D_fake']
 
-        return D_loss, D_real, D_fake
+        return losses
 
 
     def call(self, inputs, is_training=True):
