@@ -1,7 +1,9 @@
 import logging
 import os.path as osp
+import os
 import time
 import tensorflow as tf
+import h5py
 
 from .callbacks.tensorboard_logger import TensorBoardLogger
 from .callbacks.callback import Callback
@@ -85,30 +87,51 @@ class Runner(object):
         """int: Maximum training iterations."""
         return self._max_iters
 
-    def load_checkpoint(self, filename, map_location='cpu', strict=False):
-        self.logger.info('load checkpoint from %s', filename)
-        return load_checkpoint(self.model, filename, map_location, strict,
-                               self.logger)
+    def load_checkpoint(self, filename):
+        print('Loading variables')
 
-    def save_checkpoint(self,
-                        out_dir,
-                        filename_tmpl='epoch_{}.pth',
-                        save_optimizer=True,
-                        meta=None,
-                        create_symlink=True):
-        if meta is None:
-            meta = dict(epoch=self.epoch + 1, iter=self.iter)
-        else:
-            meta.update(epoch=self.epoch + 1, iter=self.iter)
+        file = h5py.File(filename, 'r')
+        weight = []
+        for i in range(len(file.keys())):
+            weight.append(file['weight' + str(i)].value)
+        self.model.set_weights(weight)
 
-        filename = filename_tmpl.format(self.epoch + 1)
-        filepath = osp.join(out_dir, filename)
-        optimizer = self.optimizer if save_optimizer else None
-        save_checkpoint(self.model, filepath, optimizer=optimizer, meta=meta)
-        # in some environments, `os.symlink` is not supported, you may need to
-        # set `create_symlink` to False
-        if create_symlink:
-            mmcv.symlink(filename, osp.join(out_dir, 'latest.pth'))
+        # file = h5py.File(filename.replace('model-', 'optimizer-'), 'r')
+        # weight = []
+        # for i in range(len(file.keys())):
+        #     weight.append(file['weight' + str(i)].value)
+        # self.optimizer.set_weights(weight)
+
+        step = int(filename.split('.h5')[0].split('-')[-1])
+        self.optimizer.assign_step(step)
+
+        self.step = step
+
+        return
+
+    def save_checkpoint(self, out_dir, filename_tmpl='model-{}.h5'):
+        print('Saving variables')
+        filename = filename_tmpl.format(self.iter)
+        filepath = osp.join(out_dir, 'models')
+        if not os.path.exists(filepath):
+            os.makedirs(filepath)
+        save_path = osp.join(filepath, filename)
+
+        file = h5py.File(save_path, 'w')
+        weight = self.model.get_weights()
+        for i in range(len(weight)):
+            file.create_dataset('weight' + str(i), data=weight[i])
+        file.close()
+
+        filename = filename_tmpl.format(self.iter).replace('model', 'optimizer')
+        save_path = osp.join(filepath, filename)
+        file = h5py.File(save_path, 'w')
+        weight = self.optimizer.get_weights()
+        for i in range(len(weight)):
+            file.create_dataset('weight' + str(i), data=weight[i])
+        file.close()
+
+        return
 
     def train(self, data_loader, **kwargs):
         self.mode = 'train'
@@ -121,31 +144,48 @@ class Runner(object):
 
             with tf.GradientTape() as tape:
                 outputs = self.batch_processor(self.model, data_batch,
-                                               self.optimizer, train_mode=True, **kwargs)
+                                               train_mode=True, **kwargs)
 
             if not isinstance(outputs, dict):
                 raise TypeError('batch_processor() must return a dict')
-            assert 'total_loss' in outputs
 
-            self.outputs = outputs
-            self.callback.after_step(tape, outputs['total_loss'], outputs, self.step, self.mode)
+            self.callback.after_discriminator_step(tape, outputs, outputs, self.step, self.mode)
+
+            if i > 0 and i % 5 == 0:
+                with tf.GradientTape() as tape:
+                    outputs = self.batch_processor(self.model, data_batch,
+                                                   train_mode=True, **kwargs)
+
+                self.callback.after_generator_step(tape, outputs, outputs, self.step, self.mode)
+
+            with tf.GradientTape() as tape:
+                outputs = self.batch_processor(self.model, data_batch,
+                                               train_mode=True, **kwargs)
+
+            self.callback.after_discriminator_step(tape, outputs, outputs, self.step, self.mode)
+
             self.step += 1
+
+            if self.step % 10000 == 0:
+                self.save_checkpoint(self.work_dir)
 
         self.callback.after_epoch()
         self._epoch += 1
+        self.save_checkpoint(self.work_dir)
 
-    def val(self, data_loader, **kwargs):
+        return
+
+    def valid(self, data_loader, **kwargs):
         self.model.eval()
-        self.mode = 'val'
+        self.mode = 'valid'
         self.data_loader = data_loader
         self.call_hook('before_val_epoch')
 
         for i, data_batch in enumerate(data_loader):
             self._inner_iter = i
             self.call_hook('before_val_iter')
-            with torch.no_grad():
-                outputs = self.batch_processor(
-                    self.model, data_batch, train_mode=False, **kwargs)
+            outputs = self.batch_processor(
+                self.model, data_batch, train_mode=False, **kwargs)
             if not isinstance(outputs, dict):
                 raise TypeError('batch_processor() must return a dict')
             if 'log_vars' in outputs:
@@ -182,9 +222,7 @@ class Runner(object):
                     if mode == 'train' and self.epoch >= max_epochs:
                         return
                     epoch_runner(data_loaders[i], **kwargs)
-            # self.train(data_loaders, **kwargs)
 
-        time.sleep(1)  # wait for some hooks like loggers to finish
-        # self.call_hook('after_run')
+        time.sleep(1)
 
         return

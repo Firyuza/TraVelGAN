@@ -21,7 +21,8 @@ class TensorSlicesDataset:
         for key, values in input_ops_chain.items():
             if 'map' in key and map_func_name is not None:
                 values['map_func'] = getattr(self.dataset, map_func_name)
-            getattr(self, key)(values)
+            # getattr(self, key)(values)
+            self.data_loader = getattr(self.data_loader, key)(**values)
 
         return
 
@@ -32,5 +33,10 @@ class TensorSlicesDataset:
 
     def batch(self, kwargs):
         self.data_loader = self.data_loader.batch(**kwargs)
+
+        return
+
+    def shuffle(self, kwargs):
+        self.data_loader = self.data_loader.shuffle(**kwargs)
 
         return

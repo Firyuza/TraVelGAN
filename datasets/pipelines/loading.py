@@ -28,9 +28,9 @@ class LoadImageFromFile(object):
                                 results['img_info']['filename'])
         else:
             filename = results['img_info']['filename']
-
         flag = self.imread_flags[self.color_type] if isinstance(self.color_type, six.string_types) else self.color_type
         img = cv2.imread(filename, flag)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
         if self.to_float32:
             img = img.astype(np.float32)

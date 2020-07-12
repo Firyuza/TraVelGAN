@@ -24,7 +24,7 @@ class Callback:
         return
 
     def after_discriminator_step(self, tape, loss, values_dict, step, mode):
-        self.optimizer.apply_discriminator_gradients(tape, loss, self.model)
+        self.optimizer.apply_discriminator_gradients(tape, loss['D_loss'], self.model)
 
         self.tensorboard_logger.log_scalar(mode, 'learning_rate', self.optimizer.get_current_lr(step), step)
         self.tensorboard_logger.log_scalars(mode, values_dict, step)
@@ -32,7 +32,7 @@ class Callback:
         return
 
     def after_generator_step(self, tape, loss, values_dict, step, mode):
-        self.optimizer.apply_generator_gradients(tape, loss, self.model)
+        self.optimizer.apply_generator_gradients(tape, loss['G_loss'], self.model)
 
         self.tensorboard_logger.log_scalar(mode, 'learning_rate', self.optimizer.get_current_lr(step), step)
         self.tensorboard_logger.log_scalars(mode, values_dict, step)

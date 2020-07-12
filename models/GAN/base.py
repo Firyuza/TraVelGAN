@@ -35,7 +35,17 @@ class BaseGAN(tf.keras.models.Model, metaclass=ABCMeta):
     def build(self, *args):
         self.build_model(*args)
 
+        super(BaseGAN, self).build(())
+
         return
+
+    @abstractmethod
+    def get_discriminator_variables(self):
+        pass
+
+    @abstractmethod
+    def get_generator_variables(self):
+        pass
 
     def call_test(self, imgs, img_metas, **kwargs):
         pass

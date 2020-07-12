@@ -1,11 +1,13 @@
 import argparse
 import os
-
-import tensorflow as tf
+import os.path as osp
+import time
 
 from utils.config import Config
 from utils.registry import build_from_cfg
-from datasets.builder import build_dataset, build_data_loader
+from datasets.builder import build_dataset
+from models.builder import build_GAN
+from API.train import train_model, set_random_seed, get_root_logger
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a detector')
@@ -25,7 +27,7 @@ def parse_args():
         default=1,
         help='number of gpus to use '
         '(only applicable to non-distributed training)')
-    parser.add_argument('--seed', type=int, default=None, help='random seed')
+    parser.add_argument('--seed', type=int, default=555, help='random seed')
     parser.add_argument(
         '--deterministic',
         default='',
@@ -52,7 +54,26 @@ if __name__ == '__main__':
     args = parse_args()
     cfg = Config.fromfile(args.config)
 
-    dataset = build_dataset(cfg.data.train)
-    data_loader = build_data_loader(cfg.data_loader.train, default_args={'dataset': dataset})
-    for images, labels in data_loader.data_loader:
-        print(labels)
+    # create work_dir
+    if not os.path.exists(cfg.work_dir):
+        os.makedirs(cfg.work_dir)
+    # init the logger before other steps
+    timestamp = time.strftime('%Y%m%d_%H%M%S', time.localtime())
+    log_file = osp.join(cfg.work_dir, '{}.log'.format(timestamp))
+    logger = get_root_logger(log_file=log_file, log_level=cfg.log_level)
+
+    # log some basic info
+    logger.info('Config:\n{}'.format(cfg.text))
+
+    # set random seeds
+    if args.seed is not None:
+        # logger.info('Set random seed to {}'.format(args.seed))
+        set_random_seed(args.seed)
+
+    datasets = [build_dataset(cfg.data.train)]
+    if len(cfg.workflow) == 2:
+        datasets.append(build_dataset(cfg.data.valid))
+
+    model = build_GAN(cfg.model, train_cfg=cfg.train_cfg, test_cfg=cfg.test_cfg)
+
+    train_model(model, datasets, cfg)

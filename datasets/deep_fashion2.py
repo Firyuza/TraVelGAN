@@ -11,20 +11,10 @@ from .registry import DATASETS
 @DATASETS.register_module
 class DeepFashion2Dataset(BaseDataset):
 
-    CLASSES = ('person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
-               'train', 'truck', 'boat', 'traffic_light', 'fire_hydrant',
-               'stop_sign', 'parking_meter', 'bench', 'bird', 'cat', 'dog',
-               'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe',
-               'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee',
-               'skis', 'snowboard', 'sports_ball', 'kite', 'baseball_bat',
-               'baseball_glove', 'skateboard', 'surfboard', 'tennis_racket',
-               'bottle', 'wine_glass', 'cup', 'fork', 'knife', 'spoon', 'bowl',
-               'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot',
-               'hot_dog', 'pizza', 'donut', 'cake', 'chair', 'couch',
-               'potted_plant', 'bed', 'dining_table', 'toilet', 'tv', 'laptop',
-               'mouse', 'remote', 'keyboard', 'cell_phone', 'microwave',
-               'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock',
-               'vase', 'scissors', 'teddy_bear', 'hair_drier', 'toothbrush')
+    CLASSES = ('short_sleeved_shirt', 'long_sleeved_shirt', 'short_sleeved_outwear', 'long_sleeved_outwear',
+               'vest', 'sling',  'shorts', 'trousers', 'skirt',
+               'short_sleeved_dress', 'long_sleeved_dress',
+               'vest_dress', 'sling_dress')
 
     def load_annotations(self, ann_file):
         self.coco = COCO(ann_file)
@@ -40,8 +30,9 @@ class DeepFashion2Dataset(BaseDataset):
             info['filename'] = info['file_name']
             img_infos.append(info)
 
-        if 'category_to_pairs' in self.coco.dataset:
+        if 'category_to_pairs' in self.coco.dataset and not self.test_mode:
             self.prepare_train_data()
+            self.shuffle_data_indices()
 
         return img_infos
 
@@ -55,8 +46,17 @@ class DeepFashion2Dataset(BaseDataset):
         self.data_indices = []
         for key, values in self.coco.dataset['category_to_pairs'].items():
             for pair_id, (shop, user) in values.items():
-                self.data_indices.append([key, pair_id, 'shop'])
-                self.data_indices.append([key, pair_id, 'user'])
+                self.data_indices.append([[key, pair_id, 'shop'],
+                                          [key, pair_id, 'user']])
+                # self.data_indices.append([key, pair_id, 'user'])
+
+        return
+
+    def shuffle_data_indices(self):
+        indices = np.random.permutation(len(self.data_indices))
+        self.data_indices = np.asarray(self.data_indices)[indices]
+
+        self.data_indices = np.reshape(self.data_indices, [-1, 3])
 
         return
 

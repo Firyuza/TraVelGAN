@@ -1,186 +1,49 @@
+from datetime import datetime
+
 # model settings
-norm_cfg = dict(type='BN', requires_grad=False)
 model = dict(
     type='TraVeLGAN',
-    num_stages=3,
-    pretrained='open-mmlab://resnet50_caffe',
-    backbone=dict(
-        type='ResNet',
-        depth=50,
-        num_stages=3,
-        strides=(1, 2, 2),
-        dilations=(1, 1, 1),
-        out_indices=(2, ),
-        frozen_stages=1,
-        norm_cfg=norm_cfg,
-        norm_eval=True,
-        style='caffe'),
-    shared_head=dict(
-        type='ResLayer',
-        depth=50,
-        stage=3,
-        stride=2,
-        dilation=1,
-        style='caffe',
-        norm_cfg=norm_cfg,
-        norm_eval=True),
-    rpn_head=dict(
-        type='RPNHead',
-        in_channels=1024,
-        feat_channels=1024,
-        anchor_scales=[2, 4, 8, 16, 32],
-        anchor_ratios=[0.5, 1.0, 2.0],
-        anchor_strides=[16],
-        target_means=[.0, .0, .0, .0],
-        target_stds=[1.0, 1.0, 1.0, 1.0],
-        loss_cls=dict(
-            type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0),
-        loss_bbox=dict(type='SmoothL1Loss', beta=1.0 / 9.0, loss_weight=1.0)),
-    bbox_roi_extractor=dict(
-        type='SingleRoIExtractor',
-        roi_layer=dict(type='RoIAlign', out_size=14, sample_num=2),
-        out_channels=1024,
-        featmap_strides=[16]),
-    bbox_head=[
-        dict(
-            type='BBoxHead',
-            with_avg_pool=True,
-            roi_feat_size=7,
-            in_channels=2048,
-            num_classes=81,
-            target_means=[0., 0., 0., 0.],
-            target_stds=[0.1, 0.1, 0.2, 0.2],
-            reg_class_agnostic=True,
-            loss_cls=dict(
-                type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0),
-            loss_bbox=dict(type='SmoothL1Loss', beta=1.0, loss_weight=1.0)),
-        dict(
-            type='BBoxHead',
-            with_avg_pool=True,
-            roi_feat_size=7,
-            in_channels=2048,
-            num_classes=81,
-            target_means=[0., 0., 0., 0.],
-            target_stds=[0.05, 0.05, 0.1, 0.1],
-            reg_class_agnostic=True,
-            loss_cls=dict(
-                type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0),
-            loss_bbox=dict(type='SmoothL1Loss', beta=1.0, loss_weight=1.0)),
-        dict(
-            type='BBoxHead',
-            with_avg_pool=True,
-            roi_feat_size=7,
-            in_channels=2048,
-            num_classes=81,
-            target_means=[0., 0., 0., 0.],
-            target_stds=[0.033, 0.033, 0.067, 0.067],
-            reg_class_agnostic=True,
-            loss_cls=dict(
-                type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0),
-            loss_bbox=dict(type='SmoothL1Loss', beta=1.0, loss_weight=1.0))
-    ],
-    mask_roi_extractor=None,
-    mask_head=dict(
-        type='FCNMaskHead',
-        num_convs=0,
-        in_channels=2048,
-        conv_out_channels=256,
-        num_classes=81,
-        loss_mask=dict(
-            type='CrossEntropyLoss', use_mask=True, loss_weight=1.0)))
+    noise_size=100,
+    discriminator=dict(
+        type='Discriminator',
+        loss_type=dict(type='BinaryCrossentropy'),
+        norm_cfg=dict(type='GroupNorm')),
+    generator=dict(
+        type='UNet',
+        loss_type=dict(type='BinaryCrossentropy'),
+        norm_cfg=dict(type='GroupNorm'),
+        # type='Generator',
+        # dense_in_shape=100,
+        # dense_out_shape=8 * 8 * 256,
+        # reshape_shape=(8, 8, 256),
+        # conv_shapes=[(256, 3, 3, 2, 2),
+        #              (128, 3, 3, 2, 2),
+        #              (64, 3, 3, 2, 2),
+        #              (3, 3, 3, 2, 2)],
+        activation='tanh'),
+    siamese_network=dict(
+        type='Discriminator',
+        output_size=1000,
+        norm_cfg=dict(type='GroupNorm')),
+    distance_loss=dict(
+        type='DistanceLoss'),
+    siamese_loss=dict(
+        type='MaxMarginLoss',
+        delta=0.7),
+)
 # model training and testing settings
 train_cfg = dict(
-    rpn=dict(
-        assigner=dict(
-            type='MaxIoUAssigner',
-            pos_iou_thr=0.7,
-            neg_iou_thr=0.3,
-            min_pos_iou=0.3,
-            ignore_iof_thr=-1),
-        sampler=dict(
-            type='RandomSampler',
-            num=256,
-            pos_fraction=0.5,
-            neg_pos_ub=-1,
-            add_gt_as_proposals=False),
-        allowed_border=0,
-        pos_weight=-1,
-        debug=False),
-    rpn_proposal=dict(
-        nms_across_levels=False,
-        nms_pre=12000,
-        nms_post=2000,
-        max_num=2000,
-        nms_thr=0.7,
-        min_bbox_size=0),
-    rcnn=[
-        dict(
-            assigner=dict(
-                type='MaxIoUAssigner',
-                pos_iou_thr=0.5,
-                neg_iou_thr=0.5,
-                min_pos_iou=0.5,
-                ignore_iof_thr=-1),
-            sampler=dict(
-                type='RandomSampler',
-                num=512,
-                pos_fraction=0.25,
-                neg_pos_ub=-1,
-                add_gt_as_proposals=True),
-            mask_size=14,
-            pos_weight=-1,
-            debug=False),
-        dict(
-            assigner=dict(
-                type='MaxIoUAssigner',
-                pos_iou_thr=0.6,
-                neg_iou_thr=0.6,
-                min_pos_iou=0.6,
-                ignore_iof_thr=-1),
-            sampler=dict(
-                type='RandomSampler',
-                num=512,
-                pos_fraction=0.25,
-                neg_pos_ub=-1,
-                add_gt_as_proposals=True),
-            mask_size=14,
-            pos_weight=-1,
-            debug=False),
-        dict(
-            assigner=dict(
-                type='MaxIoUAssigner',
-                pos_iou_thr=0.7,
-                neg_iou_thr=0.7,
-                min_pos_iou=0.7,
-                ignore_iof_thr=-1),
-            sampler=dict(
-                type='RandomSampler',
-                num=512,
-                pos_fraction=0.25,
-                neg_pos_ub=-1,
-                add_gt_as_proposals=True),
-            mask_size=14,
-            pos_weight=-1,
-            debug=False)
-    ],
-    stage_loss_weights=[1, 0.5, 0.25])
+    image_size=128,
+    image_channels=3)
 test_cfg = dict(
-    rpn=dict(
-        nms_across_levels=False,
-        nms_pre=6000,
-        nms_post=1000,
-        max_num=1000,
-        nms_thr=0.7,
-        min_bbox_size=0),
-    rcnn=dict(
-        score_thr=0.05,
-        nms=dict(type='nms', iou_thr=0.5),
-        max_per_img=100,
-        mask_thr_binary=0.5))
+    image_size=128,
+    image_channels=3)
 
 # dataset settings
 data_loader_type = 'TensorSlicesDataset'
 data_loader_chain_rule = {
+    # 'shuffle': {'buffer_size': 10000,
+    #             'reshuffle_each_iteration': True},
     'map': {'num_parallel_calls': 1},
     'batch': {'batch_size': 4},
 }
@@ -188,11 +51,11 @@ data_loader_chain_rule = {
 dataset_type = 'DeepFashion2Dataset'
 data_root = '/home/firiuza/MachineLearning/DeepFashion2/'
 img_norm_cfg = dict(
-    mean=[102.9801, 115.9465, 122.7717], std=[1.0, 1.0, 1.0], to_rgb=False)
+    mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations', with_bbox=False, with_mask=False, with_pair_id=True),
-    dict(type='Resize', img_scale=(256, 256), keep_ratio=True),
+    dict(type='Resize', img_scale=(128, 128), keep_ratio=True),
     dict(type='RandomFlip', flip_ratio=0.5),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Collect', keys=['img', 'gt_labels', 'gt_pair_id']),
@@ -204,7 +67,7 @@ test_pipeline = [
         img_scale=(1333, 800),
         flip=False,
         transforms=[
-            dict(type='Resize', keep_ratio=True),
+            dict(type='Resize', img_scale=(128, 128), keep_ratio=True),
             dict(type='RandomFlip'),
             dict(type='Normalize', **img_norm_cfg),
             dict(type='ImageToTensor', keys=['img']),
@@ -212,23 +75,23 @@ test_pipeline = [
         ])
 ]
 data = dict(
-    imgs_per_gpu=2,
-    workers_per_gpu=2,
     train=dict(
         type=dataset_type,
         ann_file=data_root + 'splits_annotations/train_deepfashion2.json',
         img_prefix=data_root + 'train/image',
         pipeline=train_pipeline),
-    val=dict(
+    valid=dict(
         type=dataset_type,
         ann_file=data_root + 'splits_annotations/validation_deepfashion2.json',
         img_prefix=data_root + 'validation/image',
-        pipeline=test_pipeline),
+        pipeline=test_pipeline,
+        test_mode=True),
     test=dict(
         type=dataset_type,
         ann_file=data_root + 'splits_annotations/train_deepfashion2.json',
         img_prefix=data_root + 'validation/image',
-        pipeline=test_pipeline)
+        pipeline=test_pipeline,
+        test_mode=True)
     )
 data_loader = dict(
         train=dict(
@@ -237,30 +100,29 @@ data_loader = dict(
             map_func_name='prepare_train_img'
         )
 )
-# optimizer
-optimizer = dict(type='SGD', lr=0.01, momentum=0.9, weight_decay=0.0001)
-optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
 # learning policy
-lr_config = dict(
-    policy='step',
-    warmup='linear',
-    warmup_iters=500,
-    warmup_ratio=1.0 / 3,
-    step=[8, 11])
-checkpoint_config = dict(interval=1)
-# yapf:disable
-log_config = dict(
-    interval=50,
-    hooks=[
-        dict(type='TextLoggerHook'),
-        # dict(type='TensorboardLoggerHook')
-    ])
-# yapf:enable
+lr_schedule = dict(
+    initial_learning_rate=2e-6,
+    decay_steps=10000,
+    decay_rate=0.99,
+    staircase=True)
+# optimizer
+optimizer = dict(
+    type='TraVelGANOptimizer',
+    optimizer_cfg=dict(
+        type='Adam',
+        params=None,
+        lr_schedule_type='ExponentialDecay',
+        lr_schedule=lr_schedule)
+)
+
+use_TensorBoard=True
+
 # runtime settings
-total_epochs = 12
-dist_params = dict(backend='nccl')
+total_epochs = 100
 log_level = 'INFO'
-work_dir = './work_dirs/cascade_mask_rcnn_r50_caffe_c4_1x'
-load_from = None
-resume_from = None
+
+work_dir = '/home/firiuza/PycharmProjects/TraVeLGAN/run_models/run_%s' % (datetime.strftime(datetime.now(), '%Y%m%d-%H%M%S'))
+
+restore_model_path = '/home/firiuza/PycharmProjects/TraVeLGAN/run_models/run_20200711-152758/models/model-50000.h5'
 workflow = [('train', 1)]

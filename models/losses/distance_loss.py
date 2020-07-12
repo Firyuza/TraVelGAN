@@ -1,4 +1,5 @@
 import tensorflow as tf
+import tensorflow_addons as tfa
 
 from ..registry import LOSSES
 
@@ -27,8 +28,8 @@ class DistanceLoss(tf.keras.losses.Loss):
         dist = tf.reduce_sum(dist_square, axis=2)
         dist = tf.reduce_sum(dist)
 
-        nrof_pairs = len(real_embeddings) ** - len(real_embeddings)
+        # nrof_pairs = len(real_embeddings) * (len(real_embeddings) - 1)
 
-        dist = tf.divide(dist, nrof_pairs)
+        dist = tf.divide(dist, 2.)#tf.divide(dist, nrof_pairs)
 
         return dist

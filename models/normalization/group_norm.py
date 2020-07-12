@@ -1,5 +1,8 @@
 import tensorflow as tf
 
+from ..registry import NORMALIZATION
+
+@NORMALIZATION.register_module
 class GroupNorm(tf.keras.layers.Layer):
     def __init__(self, C, G=32, eps=1e-5):
         super(GroupNorm, self).__init__()
@@ -9,13 +12,15 @@ class GroupNorm(tf.keras.layers.Layer):
 
         self.gamma = self.add_weight(shape=(C,),
                                      name='GroupNorm_gamma',
-                                     initializer=tf.constant_initializer(1.))
+                                     initializer=tf.constant_initializer(1.),
+                                     trainable=True)
         self.beta = self.add_weight(shape=(C,),
                                     name='GroupNorm_beta',
-                                    initializer=tf.constant_initializer(0.))
+                                    initializer=tf.constant_initializer(0.),
+                                    trainable=True)
         self.built = True
 
-    def call(self, input_tensor, is_training=False):
+    def call(self, input_tensor, training=True):
         N, H, W, C = input_tensor.get_shape().as_list()
         input_tensor_tr = tf.transpose(input_tensor, [0, 3, 1, 2])
         G = min(self.G, C)
